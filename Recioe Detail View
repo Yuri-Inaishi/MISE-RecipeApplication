@@ -1,0 +1,234 @@
+import React, { useState } from 'react';
+import { useApp } from '../../contexts/AppContext';
+import { RecipeDetailProps } from '../../types';
+import { getDifficultyLabel, formatDate, adjustAmount } from '../../utils';
+
+export const RecipeDetail: React.FC<RecipeDetailProps> = ({ recipe, onBack, onEdit }) => {
+  const { toggleFavorite, deleteRecipe } = useApp();
+  const [servings, setServings] = useState(recipe.servings);
+
+  // ==================== Servings Adjustment ====================
+  const adjustServings = (delta: number) => {
+    const newServings = Math.max(1, Math.min(10, servings + delta));
+    setServings(newServings);
+  };
+
+  // ==================== Delete Handler ====================
+  const handleDelete = () => {
+    if (window.confirm(`「${recipe.title}」を削除しますか？\nこの操作は取り消せません。`)) {
+      deleteRecipe(recipe.id);
+      onBack();
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* ==================== Header ==================== */}
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-5 flex justify-between items-center">
+          <button
+            type="button"
+            onClick={onBack}
+            className="text-xl text-gray-500 hover:text-amber-700 transition-colors"
+            aria-label="戻る"
+          >
+            ←
+          </button>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => toggleFavorite(recipe.id)}
+              className={`text-xl ${
+                recipe.isFavorite ? 'text-amber-700' : 'text-gray-300'
+              } hover:text-amber-700 transition-colors`}
+              aria-label={recipe.isFavorite ? 'お気に入り解除' : 'お気に入りに追加'}
+            >
+              ★
+            </button>
+            <button
+              type="button"
+              onClick={onEdit}
+              className="text-lg text-gray-500 hover:text-amber-700 transition-colors"
+              aria-label="編集"
+            >
+              ✎
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* ==================== Main Content ==================== */}
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+        {/* ==================== Hero Section ==================== */}
+        <div className="bg-white rounded-sm shadow-sm overflow-hidden mb-8">
+          {/* 画像 */}
+          <div className="aspect-video bg-gray-100 flex items-center justify-center overflow-hidden">
+            {recipe.imageUrl ? (
+              <img
+                src={recipe.imageUrl}
+                alt={recipe.title}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <span className="text-6xl sm:text-8xl">🍽️</span>
+            )}
+          </div>
+
+          {/* レシピ情報 */}
+          <div className="p-6 sm:p-8">
+            <h1 className="text-2xl sm:text-3xl font-normal mb-4 tracking-wide">
+              {recipe.title}
+            </h1>
+            
+            {/* メタ情報 */}
+            <div className="flex flex-wrap gap-4 sm:gap-6 text-sm text-gray-500 mb-4">
+              <span className="flex items-center gap-2">
+                <span>⏱</span>
+                <span>{recipe.cookingTime}分</span>
+              </span>
+              <span className="flex items-center gap-2">
+                <span>👤</span>
+                <span>{getDifficultyLabel(recipe.difficulty)}</span>
+              </span>
+              <span className="flex items-center gap-2">
+                <span>📅</span>
+                <span>{formatDate(recipe.createdAt)}</span>
+              </span>
+            </div>
+
+            {/* タグ */}
+            {recipe.tags.length > 0 && (
+              <div className="flex gap-2 flex-wrap">
+                {recipe.tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="px-3 py-1 bg-gray-50 rounded-sm text-xs text-gray-600"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ==================== Serving Adjuster ==================== */}
+        <div className="bg-white rounded-sm shadow-sm p-5 sm:p-6 mb-6">
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-gray-500">分量調整</span>
+            <div className="flex items-center gap-4">
+              <button
+                type="button"
+                onClick={() => adjustServings(-1)}
+                disabled={servings <= 1}
+                className="w-8 h-8 border border-gray-200 rounded-sm text-gray-500 hover:border-amber-700 hover:text-amber-700 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                aria-label="分量を減らす"
+              >
+                -
+              </button>
+              <span className="text-lg font-medium min-w-[70px] text-center">
+                {servings}人分
+              </span>
+              <button
+                type="button"
+                onClick={() => adjustServings(1)}
+                disabled={servings >= 10}
+                className="w-8 h-8 border border-gray-200 rounded-sm text-gray-500 hover:border-amber-700 hover:text-amber-700 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                aria-label="分量を増やす"
+              >
+                +
+              </button>
+            </div>
+          </div>
+          {servings !== recipe.servings && (
+            <p className="text-xs text-gray-400 mt-2 text-right">
+              元のレシピ: {recipe.servings}人分
+            </p>
+          )}
+        </div>
+
+        {/* ==================== Ingredients Section ==================== */}
+        <div className="bg-white rounded-sm shadow-sm p-6 sm:p-8 mb-6">
+          <h2 className="text-lg font-normal mb-6 pb-3 border-b border-gray-200 tracking-wide">
+            材料
+          </h2>
+          <ul className="space-y-3">
+            {recipe.ingredients.map((ing) => (
+              <li
+                key={ing.id}
+                className="flex justify-between items-center py-3 border-b border-gray-50 last:border-0"
+              >
+                <span className="text-sm">{ing.name}</span>
+                <span className="text-sm text-gray-500 whitespace-nowrap ml-4">
+                  {adjustAmount(ing.amount, recipe.servings, servings)} {ing.unit}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {/* ==================== Steps Section ==================== */}
+        <div className="bg-white rounded-sm shadow-sm p-6 sm:p-8 mb-6">
+          <h2 className="text-lg font-normal mb-6 pb-3 border-b border-gray-200 tracking-wide">
+            作り方
+          </h2>
+          <ol className="space-y-5">
+            {recipe.steps.map((step) => (
+              <li
+                key={step.id}
+                className="flex gap-4 sm:gap-5 pb-5 border-b border-gray-50 last:border-0"
+              >
+                <span className="text-lg font-medium text-amber-700 min-w-[32px] flex-shrink-0">
+                  {step.stepNumber}
+                </span>
+                <p className="text-sm leading-relaxed">{step.description}</p>
+              </li>
+            ))}
+          </ol>
+        </div>
+
+        {/* ==================== Notes Section ==================== */}
+        {recipe.description && (
+          <div className="bg-amber-50 border-l-4 border-amber-700 rounded-sm p-5 sm:p-6 mb-6">
+            <h3 className="text-sm font-medium text-amber-700 mb-3 flex items-center gap-2">
+              <span>💡</span>
+              <span>コツ・ポイント</span>
+            </h3>
+            <p className="text-sm leading-relaxed text-gray-600 whitespace-pre-wrap">
+              {recipe.description}
+            </p>
+          </div>
+        )}
+
+        {/* ==================== Action Buttons ==================== */}
+        <div className="flex flex-col sm:flex-row gap-3">
+          <button
+            type="button"
+            onClick={onEdit}
+            className="flex-1 py-3 border border-gray-200 rounded-sm text-sm hover:border-amber-700 hover:text-amber-700 transition-colors"
+          >
+            編集する
+          </button>
+          <button
+            type="button"
+            onClick={handleDelete}
+            className="flex-1 py-3 border border-red-200 text-red-600 rounded-sm text-sm hover:bg-red-50 transition-colors"
+          >
+            削除
+          </button>
+        </div>
+
+        {/* ==================== Back Button (Mobile) ==================== */}
+        <div className="mt-6 sm:hidden">
+          <button
+            type="button"
+            onClick={onBack}
+            className="w-full py-3 border border-gray-200 rounded-sm text-sm text-gray-600 hover:border-amber-700 hover:text-amber-700 transition-colors"
+          >
+            レシピ一覧に戻る
+          </button>
+        </div>
+      </main>
+    </div>
+  );
+};
