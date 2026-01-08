@@ -1,0 +1,417 @@
+import React, { useState } from 'react';
+import { useApp } from '../../contexts/AppContext';
+import { RecipeFormProps, Ingredient, Step, Difficulty } from '../../types';
+import { generateId, validateRecipe } from '../../utils';
+
+export const RecipeForm: React.FC<RecipeFormProps> = ({ recipe, onBack, onSave }) => {
+  const { addRecipe, updateRecipe } = useApp();
+
+  // ==================== Form State ====================
+  const [title, setTitle] = useState(recipe?.title || '');
+  const [cookingTime, setCookingTime] = useState(recipe?.cookingTime || 30);
+  const [difficulty, setDifficulty] = useState<Difficulty>(recipe?.difficulty || 'beginner');
+  const [servings, setServings] = useState(recipe?.servings || 2);
+  const [description, setDescription] = useState(recipe?.description || '');
+  const [tags, setTags] = useState<string[]>(recipe?.tags || []);
+  const [ingredients, setIngredients] = useState<Ingredient[]>(
+    recipe?.ingredients && recipe.ingredients.length > 0
+      ? recipe.ingredients
+      : [{ id: generateId(), name: '', amount: '', unit: '' }]
+  );
+  const [steps, setSteps] = useState<Step[]>(
+    recipe?.steps && recipe.steps.length > 0
+      ? recipe.steps
+      : [{ id: generateId(), stepNumber: 1, description: '' }]
+  );
+  const [tagInput, setTagInput] = useState('');
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // ==================== Ingredients Management ====================
+  const addIngredient = () => {
+    setIngredients([
+      ...ingredients,
+      { id: generateId(), name: '', amount: '', unit: '' },
+    ]);
+  };
+
+  const removeIngredient = (id: string) => {
+    if (ingredients.length > 1) {
+      setIngredients(ingredients.filter((i) => i.id !== id));
+    }
+  };
+
+  const updateIngredient = (id: string, field: keyof Ingredient, value: string) => {
+    setIngredients(
+      ingredients.map((i) => (i.id === id ? { ...i, [field]: value } : i))
+    );
+  };
+
+  // ==================== Steps Management ====================
+  const addStep = () => {
+    setSteps([
+      ...steps,
+      { id: generateId(), stepNumber: steps.length + 1, description: '' },
+    ]);
+  };
+
+  const removeStep = (id: string) => {
+    if (steps.length > 1) {
+      const newSteps = steps.filter((s) => s.id !== id);
+      setSteps(newSteps.map((s, i) => ({ ...s, stepNumber: i + 1 })));
+    }
+  };
+
+  const updateStep = (id: string, description: string) => {
+    setSteps(steps.map((s) => (s.id === id ? { ...s, description } : s)));
+  };
+
+  // ==================== Tags Management ====================
+  const addTag = () => {
+    const trimmedTag = tagInput.trim();
+    if (trimmedTag && !tags.includes(trimmedTag)) {
+      setTags([...tags, trimmedTag]);
+      setTagInput('');
+    }
+  };
+
+  const removeTag = (tag: string) => {
+    setTags(tags.filter((t) => t !== tag));
+  };
+
+  const handleTagKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addTag();
+    }
+  };
+
+  // ==================== Validation ====================
+  const validate = (): boolean => {
+    const newErrors: Record<string, string> = {};
+
+    if (!validateRecipe(title)) {
+      newErrors.title = 'レシピ名を入力してください';
+    }
+
+    const validIngredients = ingredients.filter((i) => i.name.trim());
+    if (validIngredients.length === 0) {
+      newErrors.ingredients = '最低1つの材料を入力してください';
+    }
+
+    const validSteps = steps.filter((s) => s.description.trim());
+    if (validSteps.length === 0) {
+      newErrors.steps = '最低1つの手順を入力してください';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  // ==================== Submit Handler ====================
+  const handleSubmit = () => {
+    if (!validate()) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    const recipeData = {
+      title,
+      cookingTime,
+      difficulty,
+      servings,
+      description,
+      tags,
+      ingredients: ingredients.filter((i) => i.name.trim()),
+      steps: steps.filter((s) => s.description.trim()),
+      isFavorite: recipe?.isFavorite || false,
+    };
+
+    if (recipe) {
+      updateRecipe(recipe.id, recipeData);
+    } else {
+      addRecipe(recipeData);
+    }
+
+    onSave();
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* ==================== Header ==================== */}
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-5 flex justify-between items-center">
+          <button
+            type="button"
+            onClick={onBack}
+            className="text-xl text-gray-500 hover:text-amber-700 transition-colors"
+          >
+            ←
+          </button>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={handleSubmit}
+              className="px-4 sm:px-5 py-2 bg-amber-700 text-white rounded-sm text-sm tracking-wide hover:bg-amber-800 transition-colors"
+            >
+              保存する
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* ==================== Main Content ==================== */}
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+        <h1 className="text-xl sm:text-2xl font-normal mb-6 sm:mb-8 tracking-wide">
+          {recipe ? 'レシピを編集' : '新しいレシピを作成'}
+        </h1>
+
+        {/* エラーメッセージ */}
+        {Object.keys(errors).length > 0 && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-sm">
+            <p className="text-sm text-red-600 font-medium mb-2">
+              入力内容を確認してください
+            </p>
+            <ul className="text-xs text-red-500 space-y-1">
+              {Object.values(errors).map((error, index) => (
+                <li key={index}>• {error}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* ==================== Basic Info Section ==================== */}
+        <div className="bg-white rounded-sm shadow-sm p-6 sm:p-8 mb-6">
+          <h2 className="text-base font-medium mb-6 pb-3 border-b border-gray-200">
+            基本情報
+          </h2>
+
+          {/* レシピ名 */}
+          <div className="mb-6">
+            <label className="block text-xs text-gray-500 mb-2 tracking-wide">
+              レシピ名 *
+            </label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="例：ふわふわパンケーキ"
+              className={`w-full px-4 py-3 border rounded-sm text-sm focus:outline-none transition-colors ${
+                errors.title
+                  ? 'border-red-300 focus:border-red-500'
+                  : 'border-gray-200 focus:border-amber-700'
+              }`}
+            />
+          </div>
+
+          {/* 調理時間と難易度 */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+            <div>
+              <label className="block text-xs text-gray-500 mb-2 tracking-wide">
+                調理時間（分）
+              </label>
+              <input
+                type="number"
+                value={cookingTime}
+                onChange={(e) => setCookingTime(Number(e.target.value))}
+                min="1"
+                className="w-full px-4 py-3 border border-gray-200 rounded-sm text-sm focus:outline-none focus:border-amber-700"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-2 tracking-wide">
+                難易度
+              </label>
+              <select
+                value={difficulty}
+                onChange={(e) => setDifficulty(e.target.value as Difficulty)}
+                className="w-full px-4 py-3 border border-gray-200 rounded-sm text-sm focus:outline-none focus:border-amber-700"
+              >
+                <option value="beginner">初級</option>
+                <option value="intermediate">中級</option>
+                <option value="advanced">上級</option>
+              </select>
+            </div>
+          </div>
+
+          {/* 何人分 */}
+          <div className="mb-6">
+            <label className="block text-xs text-gray-500 mb-2 tracking-wide">
+              何人分
+            </label>
+            <input
+              type="number"
+              value={servings}
+              onChange={(e) => setServings(Number(e.target.value))}
+              min="1"
+              max="10"
+              className="w-full px-4 py-3 border border-gray-200 rounded-sm text-sm focus:outline-none focus:border-amber-700"
+            />
+          </div>
+
+          {/* タグ */}
+          <div>
+            <label className="block text-xs text-gray-500 mb-2 tracking-wide">
+              タグ
+            </label>
+            <div className="flex flex-wrap gap-2 p-3 border border-gray-200 rounded-sm min-h-[48px] focus-within:border-amber-700">
+              {tags.map((tag) => (
+                <span
+                  key={tag}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 bg-gray-50 rounded-full text-xs"
+                >
+                  {tag}
+                  <button
+                    type="button"
+                    onClick={() => removeTag(tag)}
+                    className="text-gray-400 hover:text-amber-700"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+              <input
+                type="text"
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                onKeyPress={handleTagKeyPress}
+                placeholder="タグを追加してEnter..."
+                className="flex-1 min-w-[120px] outline-none text-sm"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* ==================== Ingredients Section ==================== */}
+        <div className="bg-white rounded-sm shadow-sm p-6 sm:p-8 mb-6">
+          <h2 className="text-base font-medium mb-6 pb-3 border-b border-gray-200">
+            材料
+          </h2>
+          <div className="space-y-3 mb-4">
+            {ingredients.map((ing, index) => (
+              <div
+                key={ing.id}
+                className="grid grid-cols-1 sm:grid-cols-[2fr_1fr_100px_40px] gap-3"
+              >
+                <input
+                  type="text"
+                  value={ing.name}
+                  onChange={(e) => updateIngredient(ing.id, 'name', e.target.value)}
+                  placeholder="材料名"
+                  className="px-4 py-3 border border-gray-200 rounded-sm text-sm focus:outline-none focus:border-amber-700"
+                />
+                <input
+                  type="text"
+                  value={ing.amount}
+                  onChange={(e) => updateIngredient(ing.id, 'amount', e.target.value)}
+                  placeholder="分量"
+                  className="px-4 py-3 border border-gray-200 rounded-sm text-sm focus:outline-none focus:border-amber-700"
+                />
+                <input
+                  type="text"
+                  value={ing.unit}
+                  onChange={(e) => updateIngredient(ing.id, 'unit', e.target.value)}
+                  placeholder="単位"
+                  className="px-4 py-3 border border-gray-200 rounded-sm text-sm focus:outline-none focus:border-amber-700"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeIngredient(ing.id)}
+                  disabled={ingredients.length === 1}
+                  className="border border-gray-200 text-gray-400 rounded-sm hover:border-red-300 hover:text-red-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+          {errors.ingredients && (
+            <p className="text-xs text-red-500 mb-4">{errors.ingredients}</p>
+          )}
+          <button
+            type="button"
+            onClick={addIngredient}
+            className="w-full py-3 bg-gray-50 border border-dashed border-gray-300 rounded-sm text-sm text-gray-600 hover:border-amber-700 hover:text-amber-700 hover:bg-amber-50 transition-colors"
+          >
+            + 材料を追加
+          </button>
+        </div>
+
+        {/* ==================== Steps Section ==================== */}
+        <div className="bg-white rounded-sm shadow-sm p-6 sm:p-8 mb-6">
+          <h2 className="text-base font-medium mb-6 pb-3 border-b border-gray-200">
+            作り方
+          </h2>
+          <div className="space-y-3 mb-4">
+            {steps.map((step) => (
+              <div
+                key={step.id}
+                className="grid grid-cols-1 sm:grid-cols-[50px_1fr_40px] gap-3"
+              >
+                <div className="flex items-start justify-center bg-gray-50 rounded-sm text-sm font-medium text-amber-700 py-3">
+                  {step.stepNumber}
+                </div>
+                <textarea
+                  value={step.description}
+                  onChange={(e) => updateStep(step.id, e.target.value)}
+                  placeholder="手順を入力..."
+                  className="px-4 py-3 border border-gray-200 rounded-sm text-sm focus:outline-none focus:border-amber-700 resize-none"
+                  rows={3}
+                />
+                <button
+                  type="button"
+                  onClick={() => removeStep(step.id)}
+                  disabled={steps.length === 1}
+                  className="border border-gray-200 text-gray-400 rounded-sm hover:border-red-300 hover:text-red-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed h-12"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+          {errors.steps && (
+            <p className="text-xs text-red-500 mb-4">{errors.steps}</p>
+          )}
+          <button
+            type="button"
+            onClick={addStep}
+            className="w-full py-3 bg-gray-50 border border-dashed border-gray-300 rounded-sm text-sm text-gray-600 hover:border-amber-700 hover:text-amber-700 hover:bg-amber-50 transition-colors"
+          >
+            + 手順を追加
+          </button>
+        </div>
+
+        {/* ==================== Notes Section ==================== */}
+        <div className="bg-white rounded-sm shadow-sm p-6 sm:p-8 mb-6">
+          <h2 className="text-base font-medium mb-6 pb-3 border-b border-gray-200">
+            メモ・コツ
+          </h2>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="料理のポイントやアレンジ方法など"
+            className="w-full px-4 py-3 border border-gray-200 rounded-sm text-sm focus:outline-none focus:border-amber-700 resize-none"
+            rows={4}
+          />
+        </div>
+
+        {/* ==================== Action Buttons ==================== */}
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={onBack}
+            className="flex-1 py-3 border border-gray-200 rounded-sm text-sm hover:border-amber-700 hover:text-amber-700 transition-colors"
+          >
+            キャンセル
+          </button>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            className="flex-1 py-3 bg-amber-700 text-white rounded-sm text-sm tracking-wide hover:bg-amber-800 transition-colors"
+          >
+            保存する
+          </button>
+        </div>
+      </main>
+    </div>
+  );
+};
