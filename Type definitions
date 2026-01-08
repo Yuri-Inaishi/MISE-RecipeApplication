@@ -1,0 +1,86 @@
+// ==================== User Types ====================
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+}
+
+// ==================== Recipe Types ====================
+export interface Ingredient {
+  id: string;
+  name: string;
+  amount: string;
+  unit: string;
+}
+
+export interface Step {
+  id: string;
+  stepNumber: number;
+  description: string;
+}
+
+export type Difficulty = 'beginner' | 'intermediate' | 'advanced';
+
+export interface Recipe {
+  id: string;
+  userId: string;
+  title: string;
+  description: string;
+  cookingTime: number;
+  difficulty: Difficulty;
+  servings: number;
+  imageUrl?: string;
+  isFavorite: boolean;
+  tags: string[];
+  ingredients: Ingredient[];
+  steps: Step[];
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export type RecipeFormData = Omit<Recipe, 'id' | 'userId' | 'createdAt' | 'updatedAt'>;
+
+// ==================== Auth Types ====================
+export interface LoginCredentials {
+  email: string;
+  password: string;
+}
+
+export interface SignupCredentials extends LoginCredentials {
+  name: string;
+}
+
+// ==================== Context Types ====================
+export interface AppContextType {
+  user: User | null;
+  recipes: Recipe[];
+  login: (credentials: LoginCredentials) => Promise<void>;
+  signup: (credentials: SignupCredentials) => Promise<void>;
+  logout: () => void;
+  addRecipe: (recipe: RecipeFormData) => void;
+  updateRecipe: (id: string, recipe: Partial<Recipe>) => void;
+  deleteRecipe: (id: string) => void;
+  toggleFavorite: (id: string) => void;
+}
+
+// ==================== Component Props Types ====================
+export interface LoginScreenProps {
+  onLogin: () => void;
+}
+
+export interface DashboardProps {
+  onCreateRecipe: () => void;
+  onViewRecipe: (recipe: Recipe) => void;
+}
+
+export interface RecipeDetailProps {
+  recipe: Recipe;
+  onBack: () => void;
+  onEdit: () => void;
+}
+
+export interface RecipeFormProps {
+  recipe?: Recipe;
+  onBack: () => void;
+  onSave: () => void;
+}
