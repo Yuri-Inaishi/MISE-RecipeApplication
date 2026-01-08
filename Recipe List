@@ -1,0 +1,242 @@
+import React, { useState, useMemo } from 'react';
+import { useApp } from '../../contexts/AppContext';
+import { DashboardProps, Recipe } from '../../types';
+import { 
+  getDifficultyLabel, 
+  filterRecipesBySearch, 
+  filterRecipesByTag,
+  extractAllTags 
+} from '../../utils';
+
+export const Dashboard: React.FC<DashboardProps> = ({ onCreateRecipe, onViewRecipe }) => {
+  const { user, recipes, logout, toggleFavorite } = useApp();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedTag, setSelectedTag] = useState('すべて');
+
+  // すべてのタグを取得
+  const allTags = useMemo(() => {
+    const tags = extractAllTags(recipes);
+    return ['すべて', 'お気に入り', ...tags];
+  }, [recipes]);
+
+  // フィルター済みレシピ
+  const filteredRecipes = useMemo(() => {
+    let result = recipes;
+
+    // タグでフィルター
+    result = filterRecipesByTag(result, selectedTag);
+
+    // 検索クエリでフィルター
+    if (searchQuery.trim()) {
+      result = filterRecipesBySearch(result, searchQuery);
+    }
+
+    return result;
+  }, [recipes, selectedTag, searchQuery]);
+
+  // お気に入りトグル（イベント伝播を防ぐ）
+  const handleToggleFavorite = (e: React.MouseEvent, recipeId: string) => {
+    e.stopPropagation();
+    toggleFavorite(recipeId);
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* ==================== Header ==================== */}
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-5 flex justify-between items-center">
+          <h1 className="text-xl sm:text-2xl font-light tracking-widest text-amber-700">
+            MISE
+          </h1>
+          <div className="flex items-center gap-3">
+            {/* ユーザーアバター */}
+            <button
+              type="button"
+              onClick={logout}
+              className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center text-sm text-gray-600 hover:bg-gray-300 transition-colors"
+              title={`${user?.name} - ログアウト`}
+            >
+              {user?.name.charAt(0)}
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* ==================== Main Content ==================== */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+        {/* ==================== Search Section ==================== */}
+        <section className="mb-8 sm:mb-10">
+          <div className="flex flex-col sm:flex-row gap-3 mb-5">
+            {/* 検索バー */}
+            <div className="flex-1 relative">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg">
+                🔍
+              </span>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="レシピ名や材料で検索..."
+                className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-sm text-sm focus:outline-none focus:border-amber-700 transition-colors"
+              />
+            </div>
+
+            {/* レシピ追加ボタン */}
+            <button
+              type="button"
+              onClick={onCreateRecipe}
+              className="px-6 py-3 bg-amber-700 text-white rounded-sm text-sm tracking-wide hover:bg-amber-800 transition-colors whitespace-nowrap"
+            >
+              + レシピを追加
+            </button>
+          </div>
+
+          {/* タグフィルター */}
+          <div className="flex gap-2 flex-wrap">
+            {allTags.map((tag) => (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => setSelectedTag(tag)}
+                className={`px-3 py-1.5 rounded-full text-xs transition-all ${
+                  selectedTag === tag
+                    ? 'bg-amber-700 text-white border border-amber-700'
+                    : 'bg-white text-gray-600 border border-gray-200 hover:border-amber-700 hover:text-amber-700'
+                }`}
+              >
+                {tag}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        {/* ==================== Recipe Grid Section ==================== */}
+        <section>
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-base sm:text-lg font-normal tracking-wide">
+              マイレシピ
+              {filteredRecipes.length > 0 && (
+                <span className="ml-2 text-sm text-gray-400">
+                  ({filteredRecipes.length}件)
+                </span>
+              )}
+            </h2>
+          </div>
+
+          {/* 空の状態 */}
+          {filteredRecipes.length === 0 && (
+            <div className="text-center py-16 sm:py-20">
+              <div className="text-5xl sm:text-6xl text-gray-200 mb-4">
+                {searchQuery || selectedTag !== 'すべて' ? '🔍' : '📝'}
+              </div>
+              <h3 className="text-lg text-gray-600 mb-2">
+                {searchQuery || selectedTag !== 'すべて'
+                  ? 'レシピが見つかりません'
+                  : 'レシピがありません'}
+              </h3>
+              <p className="text-sm text-gray-400">
+                {searchQuery || selectedTag !== 'すべて'
+                  ? '別の条件で検索してみましょう'
+                  : '新しいレシピを追加してみましょう'}
+              </p>
+            </div>
+          )}
+
+          {/* レシピグリッド */}
+          {filteredRecipes.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+              {filteredRecipes.map((recipe) => (
+                <RecipeCard
+                  key={recipe.id}
+                  recipe={recipe}
+                  onView={() => onViewRecipe(recipe)}
+                  onToggleFavorite={(e) => handleToggleFavorite(e, recipe.id)}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+      </main>
+    </div>
+  );
+};
+
+// ==================== Recipe Card Component ====================
+interface RecipeCardProps {
+  recipe: Recipe;
+  onView: () => void;
+  onToggleFavorite: (e: React.MouseEvent) => void;
+}
+
+const RecipeCard: React.FC<RecipeCardProps> = ({ recipe, onView, onToggleFavorite }) => {
+  return (
+    <div
+      onClick={onView}
+      className="bg-white rounded-sm shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
+    >
+      {/* レシピ画像 */}
+      <div className="aspect-[4/3] bg-gray-100 flex items-center justify-center overflow-hidden">
+        {recipe.imageUrl ? (
+          <img
+            src={recipe.imageUrl}
+            alt={recipe.title}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <span className="text-4xl sm:text-5xl">🍽️</span>
+        )}
+      </div>
+
+      {/* レシピ情報 */}
+      <div className="p-4 sm:p-5">
+        {/* タイトルとお気に入り */}
+        <div className="flex justify-between items-start mb-2">
+          <h3 className="text-sm sm:text-base font-normal flex-1 line-clamp-2">
+            {recipe.title}
+          </h3>
+          <button
+            type="button"
+            onClick={onToggleFavorite}
+            className={`text-xl ml-2 flex-shrink-0 ${
+              recipe.isFavorite ? 'text-amber-700' : 'text-gray-200'
+            } hover:text-amber-700 transition-colors`}
+            aria-label={recipe.isFavorite ? 'お気に入り解除' : 'お気に入りに追加'}
+          >
+            ★
+          </button>
+        </div>
+
+        {/* メタ情報 */}
+        <div className="flex gap-3 sm:gap-4 text-xs text-gray-400 mb-3">
+          <span className="flex items-center gap-1">
+            <span>⏱</span>
+            <span>{recipe.cookingTime}分</span>
+          </span>
+          <span className="flex items-center gap-1">
+            <span>👤</span>
+            <span>{getDifficultyLabel(recipe.difficulty)}</span>
+          </span>
+        </div>
+
+        {/* タグ */}
+        {recipe.tags.length > 0 && (
+          <div className="flex gap-1.5 flex-wrap">
+            {recipe.tags.slice(0, 3).map((tag) => (
+              <span
+                key={tag}
+                className="px-2 py-0.5 sm:py-1 bg-gray-50 rounded-sm text-xs text-gray-600"
+              >
+                {tag}
+              </span>
+            ))}
+            {recipe.tags.length > 3 && (
+              <span className="px-2 py-0.5 sm:py-1 text-xs text-gray-400">
+                +{recipe.tags.length - 3}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
