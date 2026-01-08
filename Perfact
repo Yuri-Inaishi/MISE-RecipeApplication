@@ -1,0 +1,763 @@
+import React, { useState, useEffect, createContext, useContext } from 'react';
+
+// ==================== Types ====================
+interface User {
+  id: string;
+  name: string;
+  email: string;
+}
+
+interface Ingredient {
+  id: string;
+  name: string;
+  amount: string;
+  unit: string;
+}
+
+interface Step {
+  id: string;
+  stepNumber: number;
+  description: string;
+}
+
+type Difficulty = 'beginner' | 'intermediate' | 'advanced';
+
+interface Recipe {
+  id: string;
+  userId: string;
+  title: string;
+  description: string;
+  cookingTime: number;
+  difficulty: Difficulty;
+  servings: number;
+  imageUrl?: string;
+  isFavorite: boolean;
+  tags: string[];
+  ingredients: Ingredient[];
+  steps: Step[];
+  createdAt: string;
+}
+
+// ==================== Sample Data ====================
+const sampleRecipes: Recipe[] = [
+  {
+    id: 'sample-1',
+    userId: 'sample-user',
+    title: '季節野菜のバルサミコサラダ',
+    description: 'アボカドは熟したものを使うと、クリーミーで美味しいです。ドレッシングは食べる直前にかけることで、野菜のシャキシャキ感が保てます。',
+    cookingTime: 15,
+    difficulty: 'beginner',
+    servings: 2,
+    imageUrl: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&h=450&fit=crop',
+    isFavorite: true,
+    tags: ['洋食', '時短', 'ヘルシー'],
+    ingredients: [
+      { id: 'ing-1-1', name: 'ミックスリーフ', amount: '100', unit: 'g' },
+      { id: 'ing-1-2', name: 'ミニトマト', amount: '8', unit: '個' },
+      { id: 'ing-1-3', name: 'アボカド', amount: '1', unit: '個' },
+      { id: 'ing-1-4', name: 'モッツァレラチーズ', amount: '100', unit: 'g' },
+    ],
+    steps: [
+      { id: 'step-1-1', stepNumber: 1, description: 'ミックスリーフはよく洗い、水気をしっかり切る。ミニトマトは半分に切る。' },
+      { id: 'step-1-2', stepNumber: 2, description: 'アボカドは種と皮を取り除き、一口大に切る。モッツァレラチーズも一口大にちぎる。' },
+    ],
+    createdAt: '2024-01-15T10:00:00.000Z',
+  },
+  {
+    id: 'sample-2',
+    userId: 'sample-user',
+    title: 'ふわふわパンケーキ',
+    description: '生地を混ぜすぎると膨らまないので注意。一晩寝かせるとよりふわふわに仕上がります。',
+    cookingTime: 20,
+    difficulty: 'beginner',
+    servings: 2,
+    imageUrl: 'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=600&h=450&fit=crop',
+    isFavorite: true,
+    tags: ['デザート', '朝食'],
+    ingredients: [
+      { id: 'ing-2-1', name: '薄力粉', amount: '200', unit: 'g' },
+      { id: 'ing-2-2', name: '卵', amount: '2', unit: '個' },
+      { id: 'ing-2-3', name: '牛乳', amount: '300', unit: 'ml' },
+    ],
+    steps: [
+      { id: 'step-2-1', stepNumber: 1, description: 'ボウルに薄力粉、ベーキングパウダー、砂糖、塩を入れて混ぜる。' },
+      { id: 'step-2-2', stepNumber: 2, description: '別のボウルで卵を溶きほぐし、牛乳を加えて混ぜる。' },
+    ],
+    createdAt: '2024-01-20T14:30:00.000Z',
+  },
+];
+
+// ==================== Utils ====================
+const generateId = () => Date.now().toString() + Math.random().toString(36).substr(2, 9);
+
+const getDifficultyLabel = (difficulty: Difficulty): string => {
+  const labels = { beginner: '初級', intermediate: '中級', advanced: '上級' };
+  return labels[difficulty];
+};
+
+const formatDate = (dateString: string): string => {
+  return new Date(dateString).toLocaleDateString('ja-JP');
+};
+
+const adjustAmount = (amount: string, originalServings: number, newServings: number): string => {
+  const num = parseFloat(amount);
+  if (isNaN(num)) return amount;
+  const adjusted = (num * newServings) / originalServings;
+  return adjusted % 1 === 0 ? adjusted.toString() : adjusted.toFixed(1);
+};
+
+// ==================== Context ====================
+const AppContext = createContext<any>(undefined);
+
+const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [user, setUser] = useState<User | null>(null);
+  const [recipes, setRecipes] = useState<Recipe[]>([]);
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem('mise_user');
+    const storedRecipes = localStorage.getItem('mise_recipes');
+    
+    if (storedUser) setUser(JSON.parse(storedUser));
+    if (storedRecipes) {
+      setRecipes(JSON.parse(storedRecipes));
+    } else {
+      setRecipes(sampleRecipes);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (recipes.length > 0) {
+      localStorage.setItem('mise_recipes', JSON.stringify(recipes));
+    }
+  }, [recipes]);
+
+  const login = (email: string, password: string) => {
+    const mockUser = { id: generateId(), name: '山田太郎', email };
+    setUser(mockUser);
+    localStorage.setItem('mise_user', JSON.stringify(mockUser));
+  };
+
+  const signup = (name: string, email: string) => {
+    const mockUser = { id: generateId(), name, email };
+    setUser(mockUser);
+    localStorage.setItem('mise_user', JSON.stringify(mockUser));
+  };
+
+  const logout = () => {
+    setUser(null);
+    localStorage.removeItem('mise_user');
+  };
+
+  const addRecipe = (recipeData: any) => {
+    const newRecipe: Recipe = {
+      ...recipeData,
+      id: generateId(),
+      userId: user?.id || '',
+      createdAt: new Date().toISOString(),
+    };
+    setRecipes(prev => [...prev, newRecipe]);
+  };
+
+  const updateRecipe = (id: string, updates: any) => {
+    setRecipes(prev => prev.map(r => r.id === id ? { ...r, ...updates } : r));
+  };
+
+  const deleteRecipe = (id: string) => {
+    setRecipes(prev => prev.filter(r => r.id !== id));
+  };
+
+  const toggleFavorite = (id: string) => {
+    setRecipes(prev => prev.map(r => r.id === id ? { ...r, isFavorite: !r.isFavorite } : r));
+  };
+
+  return (
+    <AppContext.Provider value={{ user, recipes, login, signup, logout, addRecipe, updateRecipe, deleteRecipe, toggleFavorite }}>
+      {children}
+    </AppContext.Provider>
+  );
+};
+
+const useApp = () => useContext(AppContext);
+
+// ==================== Login Screen ====================
+const LoginScreen: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
+  const [isLogin, setIsLogin] = useState(true);
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const { login, signup } = useApp();
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isLogin) {
+      login(email, password);
+    } else {
+      signup(name, email);
+    }
+    onLogin();
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+      <div className="w-full max-w-md">
+        <div className="text-center mb-12">
+          <h1 className="text-4xl font-light tracking-widest text-amber-700 mb-2">MISE</h1>
+          <p className="text-xs text-gray-400 tracking-wide">シンプルに、美しく、レシピを整理する</p>
+        </div>
+        
+        <div className="bg-white rounded-sm shadow-sm p-10">
+          <div className="flex border-b border-gray-200 mb-8">
+            <button
+              type="button"
+              onClick={() => setIsLogin(true)}
+              className={`flex-1 pb-3 text-sm transition-colors ${isLogin ? 'text-amber-700 border-b-2 border-amber-700' : 'text-gray-400'}`}
+            >
+              ログイン
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsLogin(false)}
+              className={`flex-1 pb-3 text-sm transition-colors ${!isLogin ? 'text-amber-700 border-b-2 border-amber-700' : 'text-gray-400'}`}
+            >
+              新規登録
+            </button>
+          </div>
+          
+          <form onSubmit={handleSubmit}>
+            {!isLogin && (
+              <div className="mb-6">
+                <label className="block text-xs text-gray-500 mb-2">お名前</label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-200 rounded-sm text-sm focus:outline-none focus:border-amber-700"
+                  placeholder="山田太郎"
+                  required
+                />
+              </div>
+            )}
+            
+            <div className="mb-6">
+              <label className="block text-xs text-gray-500 mb-2">メールアドレス</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-200 rounded-sm text-sm focus:outline-none focus:border-amber-700"
+                placeholder="example@mail.com"
+                required
+              />
+            </div>
+            
+            <div className="mb-6">
+              <label className="block text-xs text-gray-500 mb-2">パスワード</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-200 rounded-sm text-sm focus:outline-none focus:border-amber-700"
+                placeholder="8文字以上"
+                required
+              />
+            </div>
+            
+            <button
+              type="submit"
+              className="w-full py-3 bg-amber-700 text-white rounded-sm text-sm tracking-wide hover:bg-amber-800 transition-colors"
+            >
+              {isLogin ? 'ログイン' : 'アカウントを作成'}
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ==================== Dashboard ====================
+const Dashboard: React.FC<{ onCreateRecipe: () => void; onViewRecipe: (recipe: Recipe) => void }> = ({ onCreateRecipe, onViewRecipe }) => {
+  const { user, recipes, logout, toggleFavorite } = useApp();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedTag, setSelectedTag] = useState('すべて');
+
+  const allTags = ['すべて', 'お気に入り', ...Array.from(new Set(recipes.flatMap((r: Recipe) => r.tags)))];
+
+  const filteredRecipes = recipes.filter((recipe: Recipe) => {
+    const matchesSearch = recipe.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      recipe.ingredients.some(ing => ing.name.toLowerCase().includes(searchQuery.toLowerCase()));
+    const matchesTag = selectedTag === 'すべて' || 
+      (selectedTag === 'お気に入り' ? recipe.isFavorite : recipe.tags.includes(selectedTag));
+    return matchesSearch && matchesTag;
+  });
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-5 flex justify-between items-center">
+          <h1 className="text-xl sm:text-2xl font-light tracking-widest text-amber-700">MISE</h1>
+          <button
+            type="button"
+            onClick={logout}
+            className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center text-sm text-gray-600 hover:bg-gray-300"
+            title="ログアウト"
+          >
+            {user?.name.charAt(0)}
+          </button>
+        </div>
+      </header>
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+        <section className="mb-8">
+          <div className="flex flex-col sm:flex-row gap-3 mb-5">
+            <div className="flex-1 relative">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="レシピ名や材料で検索..."
+                className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-sm text-sm focus:outline-none focus:border-amber-700"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={onCreateRecipe}
+              className="px-6 py-3 bg-amber-700 text-white rounded-sm text-sm hover:bg-amber-800"
+            >
+              + レシピを追加
+            </button>
+          </div>
+
+          <div className="flex gap-2 flex-wrap">
+            {allTags.map((tag) => (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => setSelectedTag(tag)}
+                className={`px-3 py-1.5 rounded-full text-xs transition-all ${
+                  selectedTag === tag ? 'bg-amber-700 text-white' : 'bg-white text-gray-600 border border-gray-200'
+                }`}
+              >
+                {tag}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section>
+          <h2 className="text-lg mb-6">マイレシピ ({filteredRecipes.length}件)</h2>
+          
+          {filteredRecipes.length === 0 ? (
+            <div className="text-center py-20">
+              <div className="text-6xl mb-4">📝</div>
+              <p className="text-gray-600">レシピがありません</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredRecipes.map((recipe: Recipe) => (
+                <div key={recipe.id} className="bg-white rounded-sm shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+                  <div 
+                    onClick={() => onViewRecipe(recipe)}
+                    className="aspect-[4/3] bg-gray-100 flex items-center justify-center cursor-pointer"
+                  >
+                    {recipe.imageUrl ? (
+                      <img src={recipe.imageUrl} alt={recipe.title} className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-5xl">🍽️</span>
+                    )}
+                  </div>
+                  <div className="p-5">
+                    <div className="flex justify-between items-start mb-2">
+                      <h3 
+                        onClick={() => onViewRecipe(recipe)}
+                        className="text-base font-normal cursor-pointer flex-1"
+                      >
+                        {recipe.title}
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); toggleFavorite(recipe.id); }}
+                        className={`text-xl ml-2 ${recipe.isFavorite ? 'text-amber-700' : 'text-gray-200'}`}
+                      >
+                        ★
+                      </button>
+                    </div>
+                    <div className="flex gap-4 text-xs text-gray-400 mb-3">
+                      <span>⏱ {recipe.cookingTime}分</span>
+                      <span>👤 {getDifficultyLabel(recipe.difficulty)}</span>
+                    </div>
+                    <div className="flex gap-1.5 flex-wrap">
+                      {recipe.tags.map(tag => (
+                        <span key={tag} className="px-2 py-1 bg-gray-50 rounded-sm text-xs text-gray-600">{tag}</span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      </main>
+    </div>
+  );
+};
+
+// ==================== Recipe Detail ====================
+const RecipeDetail: React.FC<{ recipe: Recipe; onBack: () => void; onEdit: () => void }> = ({ recipe, onBack, onEdit }) => {
+  const { toggleFavorite, deleteRecipe } = useApp();
+  const [servings, setServings] = useState(recipe.servings);
+
+  const handleDelete = () => {
+    if (window.confirm(`「${recipe.title}」を削除しますか？`)) {
+      deleteRecipe(recipe.id);
+      onBack();
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-5 flex justify-between items-center">
+          <button type="button" onClick={onBack} className="text-xl text-gray-500 hover:text-amber-700">←</button>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => toggleFavorite(recipe.id)}
+              className={`text-xl ${recipe.isFavorite ? 'text-amber-700' : 'text-gray-300'}`}
+            >
+              ★
+            </button>
+            <button type="button" onClick={onEdit} className="text-lg text-gray-500 hover:text-amber-700">✎</button>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-10">
+        <div className="bg-white rounded-sm shadow-sm overflow-hidden mb-8">
+          <div className="aspect-video bg-gray-100 flex items-center justify-center">
+            {recipe.imageUrl ? (
+              <img src={recipe.imageUrl} alt={recipe.title} className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-8xl">🍽️</span>
+            )}
+          </div>
+          <div className="p-8">
+            <h1 className="text-3xl font-normal mb-4">{recipe.title}</h1>
+            <div className="flex gap-6 text-sm text-gray-500 mb-4">
+              <span>⏱ {recipe.cookingTime}分</span>
+              <span>👤 {getDifficultyLabel(recipe.difficulty)}</span>
+              <span>📅 {formatDate(recipe.createdAt)}</span>
+            </div>
+            <div className="flex gap-2">
+              {recipe.tags.map(tag => (
+                <span key={tag} className="px-3 py-1 bg-gray-50 rounded-sm text-xs">{tag}</span>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-sm shadow-sm p-6 mb-6">
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-gray-500">分量調整</span>
+            <div className="flex items-center gap-4">
+              <button
+                type="button"
+                onClick={() => setServings(Math.max(1, servings - 1))}
+                className="w-8 h-8 border border-gray-200 rounded-sm"
+              >
+                -
+              </button>
+              <span className="text-lg font-medium">{servings}人分</span>
+              <button
+                type="button"
+                onClick={() => setServings(Math.min(10, servings + 1))}
+                className="w-8 h-8 border border-gray-200 rounded-sm"
+              >
+                +
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-sm shadow-sm p-8 mb-6">
+          <h2 className="text-lg mb-6 pb-3 border-b">材料</h2>
+          <ul className="space-y-3">
+            {recipe.ingredients.map(ing => (
+              <li key={ing.id} className="flex justify-between py-3 border-b border-gray-50">
+                <span className="text-sm">{ing.name}</span>
+                <span className="text-sm text-gray-500">
+                  {adjustAmount(ing.amount, recipe.servings, servings)} {ing.unit}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="bg-white rounded-sm shadow-sm p-8 mb-6">
+          <h2 className="text-lg mb-6 pb-3 border-b">作り方</h2>
+          <ol className="space-y-5">
+            {recipe.steps.map(step => (
+              <li key={step.id} className="flex gap-5 pb-5 border-b border-gray-50">
+                <span className="text-lg font-medium text-amber-700">{step.stepNumber}</span>
+                <p className="text-sm leading-relaxed">{step.description}</p>
+              </li>
+            ))}
+          </ol>
+        </div>
+
+        {recipe.description && (
+          <div className="bg-amber-50 border-l-4 border-amber-700 rounded-sm p-6 mb-6">
+            <h3 className="text-sm font-medium text-amber-700 mb-3">💡 コツ・ポイント</h3>
+            <p className="text-sm leading-relaxed text-gray-600">{recipe.description}</p>
+          </div>
+        )}
+
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={onEdit}
+            className="flex-1 py-3 border border-gray-200 rounded-sm text-sm hover:border-amber-700"
+          >
+            編集する
+          </button>
+          <button
+            type="button"
+            onClick={handleDelete}
+            className="flex-1 py-3 border border-red-200 text-red-600 rounded-sm text-sm hover:bg-red-50"
+          >
+            削除
+          </button>
+        </div>
+      </main>
+    </div>
+  );
+};
+
+// ==================== Recipe Form ====================
+const RecipeForm: React.FC<{ recipe?: Recipe; onBack: () => void; onSave: () => void }> = ({ recipe, onBack, onSave }) => {
+  const { addRecipe, updateRecipe } = useApp();
+  const [title, setTitle] = useState(recipe?.title || '');
+  const [cookingTime, setCookingTime] = useState(recipe?.cookingTime || 30);
+  const [difficulty, setDifficulty] = useState<Difficulty>(recipe?.difficulty || 'beginner');
+  const [servings, setServings] = useState(recipe?.servings || 2);
+  const [description, setDescription] = useState(recipe?.description || '');
+  const [tags, setTags] = useState<string[]>(recipe?.tags || []);
+  const [ingredients, setIngredients] = useState<Ingredient[]>(
+    recipe?.ingredients?.length ? recipe.ingredients : [{ id: generateId(), name: '', amount: '', unit: '' }]
+  );
+  const [steps, setSteps] = useState<Step[]>(
+    recipe?.steps?.length ? recipe.steps : [{ id: generateId(), stepNumber: 1, description: '' }]
+  );
+  const [tagInput, setTagInput] = useState('');
+
+  const handleSubmit = () => {
+    if (!title.trim()) {
+      alert('レシピ名を入力してください');
+      return;
+    }
+
+    const recipeData = {
+      title,
+      cookingTime,
+      difficulty,
+      servings,
+      description,
+      tags,
+      ingredients: ingredients.filter(i => i.name.trim()),
+      steps: steps.filter(s => s.description.trim()),
+      isFavorite: recipe?.isFavorite || false,
+    };
+
+    if (recipe) {
+      updateRecipe(recipe.id, recipeData);
+    } else {
+      addRecipe(recipeData);
+    }
+    onSave();
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-5 flex justify-between items-center">
+          <button type="button" onClick={onBack} className="text-xl text-gray-500">←</button>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            className="px-5 py-2 bg-amber-700 text-white rounded-sm text-sm hover:bg-amber-800"
+          >
+            保存する
+          </button>
+        </div>
+      </header>
+
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-10">
+        <h1 className="text-2xl mb-8">{recipe ? 'レシピを編集' : '新しいレシピを作成'}</h1>
+
+        <div className="bg-white rounded-sm shadow-sm p-8 mb-6">
+          <h2 className="text-base font-medium mb-6 pb-3 border-b">基本情報</h2>
+          
+          <div className="mb-6">
+            <label className="block text-xs text-gray-500 mb-2">レシピ名 *</label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="例：ふわふわパンケーキ"
+              className="w-full px-4 py-3 border border-gray-200 rounded-sm text-sm focus:outline-none focus:border-amber-700"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+            <div>
+              <label className="block text-xs text-gray-500 mb-2">調理時間（分）</label>
+              <input
+                type="number"
+                value={cookingTime}
+                onChange={(e) => setCookingTime(Number(e.target.value))}
+                className="w-full px-4 py-3 border border-gray-200 rounded-sm text-sm focus:outline-none focus:border-amber-700"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-2">難易度</label>
+              <select
+                value={difficulty}
+                onChange={(e) => setDifficulty(e.target.value as Difficulty)}
+                className="w-full px-4 py-3 border border-gray-200 rounded-sm text-sm focus:outline-none focus:border-amber-700"
+              >
+                <option value="beginner">初級</option>
+                <option value="intermediate">中級</option>
+                <option value="advanced">上級</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="mb-6">
+            <label className="block text-xs text-gray-500 mb-2">何人分</label>
+            <input
+              type="number"
+              value={servings}
+              onChange={(e) => setServings(Number(e.target.value))}
+              min="1"
+              max="10"
+              className="w-full px-4 py-3 border border-gray-200 rounded-sm text-sm focus:outline-none focus:border-amber-700"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs text-gray-500 mb-2">タグ</label>
+            <div className="flex flex-wrap gap-2 p-3 border border-gray-200 rounded-sm
+<div className="bg-white rounded-sm shadow-sm p-8 mb-6">
+      <h2 className="text-base font-medium mb-6 pb-3 border-b">材料</h2>
+      <div className="space-y-3 mb-4">
+        {ingredients.map(ing => (
+          <div key={ing.id} className="grid grid-cols-1 sm:grid-cols-[2fr_1fr_100px_40px] gap-3">
+            <input
+              type="text"
+              value={ing.name}
+              onChange={(e) => setIngredients(ingredients.map(i => i.id === ing.id ? { ...i, name: e.target.value } : i))}
+              placeholder="材料名"
+              className="px-4 py-3 border border-gray-200 rounded-sm text-sm focus:outline-none focus:border-amber-700"
+            />
+            <input
+              type="text"
+              value={ing.amount}
+              onChange={(e) => setIngredients(ingredients.map(i => i.id === ing.id ? { ...i, amount: e.target.value } : i))}
+              placeholder="分量"
+              className="px-4 py-3 border border-gray-200 rounded-sm text-sm focus:outline-none focus:border-amber-700"
+            />
+            <input
+              type="text"
+              value={ing.unit}
+              onChange={(e) => setIngredients(ingredients.map(i => i.id === ing.id ? { ...i, unit: e.target.value } : i))}
+              placeholder="単位"
+              className="px-4 py-3 border border-gray-200 rounded-sm text-sm focus:outline-none focus:border-amber-700"
+            />
+            <button
+              type="button"
+              onClick={() => setIngredients(ingredients.filter(i => i.id !== ing.id))}
+              disabled={ingredients.length === 1}
+              className="border border-gray-200 text-gray-400 rounded-sm hover:border-red-300 hover:text-red-500 disabled:opacity-50"
+            >
+              ×
+            </button>
+          </div>
+        ))}
+      </div>
+      <button
+        type="button"
+        onClick={() => setIngredients([...ingredients, { id: generateId(), name: '', amount: '', unit: '' }])}
+        className="w-full py-3 bg-gray-50 border border-dashed border-gray-300 rounded-sm text-sm text-gray-600 hover:border-amber-700"
+      >
+        + 材料を追加
+      </button>
+    </div>
+
+    <div className="bg-white rounded-sm shadow-sm p-8 mb-6">
+      <h2 className="text-base font-medium mb-6 pb-3 border-b">作り方</h2>
+      <div className="space-y-3 mb-4">
+        {steps.map(step => (
+          <div key={step.id} className="grid grid-cols-1 sm:grid-cols-[50px_1fr_40px] gap-3">
+            <div className="flex items-center justify-center bg-gray-50 rounded-sm text-sm font-medium text-amber-700 py-3">
+              {step.stepNumber}
+            </div>
+            <textarea
+              value={step.description}
+              onChange={(e) => setSteps(steps.map(s => s.id === step.id ? { ...s, description: e.target.value } : s))}
+              placeholder="手順を入力..."
+              className="px-4 py-3 border border-gray-200 rounded-sm text-sm focus:outline-none focus:border-amber-700 resize-none"
+              rows={3}
+            />
+            <button
+              type="button"
+              onClick={() => {
+                const newSteps = steps.filter(s => s.id !== step.id);
+                setSteps(newSteps.map((s, i) => ({ ...s, stepNumber: i + 1 })));
+              }}
+              disabled={steps.length === 1}
+              className="border border-gray-200 text-gray-400 rounded-sm hover:border-red-300 hover:text-red-500 disabled:opacity-50 h-12"
+            >
+              ×
+            </button>
+          </div>
+        ))}
+      </div>
+      <button
+        type="button"
+        onClick={() => setSteps([...steps, { id: generateId(), stepNumber: steps.length + 1, description: '' }])}
+        className="w-full py-3 bg-gray-50 border border-dashed border-gray-300 rounded-sm text-sm text-gray-600 hover:border-amber-700"
+      >
+        + 手順を追加
+      </button>
+    </div>
+
+    <div className="bg-white rounded-sm shadow-sm p-8 mb-6">
+      <h2 className="text-base font-medium mb-6 pb-3 border-b">メモ・コツ</h2>
+      <textarea
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+        placeholder="料理のポイントやアレンジ方法など"
+        className="w-full px-4 py-3 border border-gray-200 rounded-sm text-sm focus:outline-none focus:border-amber-700 resize-none"
+        rows={4}
+      />
+    </div>
+
+    <div className="flex gap-3">
+      <button
+        type="button"
+        onClick={onBack}
+        className="flex-1 py-3 border border-gray-200 rounded-sm text-sm hover:border-amber-700"
+      >
+        キャンセル
+      </button>
+      <button
+        type="button"
+        onClick={handleSubmit}
+        className="flex-1 py-3 bg-amber-700 text-white rounded-sm text-sm hover:bg-amber-800"
+      >
+        保存する
+      </button>
+    </div>
+  </main>
+</div>
