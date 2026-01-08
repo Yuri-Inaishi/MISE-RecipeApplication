@@ -1,0 +1,143 @@
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { 
+  User, 
+  Recipe, 
+  RecipeFormData, 
+  LoginCredentials, 
+  SignupCredentials,
+  AppContextType 
+} from '../types';
+import { storage, generateId } from '../utils';
+import { sampleRecipes } from '../utils/sampleData';
+
+// ==================== Storage Keys ====================
+const STORAGE_KEYS = {
+  USER: 'mise_user',
+  RECIPES: 'mise_recipes',
+};
+
+// ==================== Context ====================
+const AppContext = createContext<AppContextType | undefined>(undefined);
+
+// ==================== Provider ====================
+interface AppProviderProps {
+  children: ReactNode;
+}
+
+export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
+  const [user, setUser] = useState<User | null>(null);
+  const [recipes, setRecipes] = useState<Recipe[]>([]);
+
+  // 初期化：ローカルストレージからデータ読み込み
+  useEffect(() => {
+    const storedUser = storage.get<User>(STORAGE_KEYS.USER);
+    const storedRecipes = storage.get<Recipe[]>(STORAGE_KEYS.RECIPES);
+
+    if (storedUser) setUser(storedUser);
+    
+    // レシピデータがない場合はサンプルデータを使用
+    if (storedRecipes && storedRecipes.length > 0) {
+      setRecipes(storedRecipes);
+    } else {
+      setRecipes(sampleRecipes);
+      storage.set(STORAGE_KEYS.RECIPES, sampleRecipes);
+    }
+  }, []);
+
+  // レシピの変更を自動保存
+  useEffect(() => {
+    if (recipes.length >= 0) {
+      storage.set(STORAGE_KEYS.RECIPES, recipes);
+    }
+  }, [recipes]);
+
+  // ==================== 認証機能 ====================
+  const login = async (credentials: LoginCredentials): Promise<void> => {
+    // モック実装：実際はAPIコール
+    const mockUser: User = {
+      id: generateId(),
+      name: '山田太郎',
+      email: credentials.email,
+    };
+    
+    setUser(mockUser);
+    storage.set(STORAGE_KEYS.USER, mockUser);
+  };
+
+  const signup = async (credentials: SignupCredentials): Promise<void> => {
+    // モック実装：実際はAPIコール
+    const mockUser: User = {
+      id: generateId(),
+      name: credentials.name,
+      email: credentials.email,
+    };
+    
+    setUser(mockUser);
+    storage.set(STORAGE_KEYS.USER, mockUser);
+  };
+
+  const logout = (): void => {
+    setUser(null);
+    storage.remove(STORAGE_KEYS.USER);
+  };
+
+  // ==================== レシピ管理 ====================
+  const addRecipe = (recipeData: RecipeFormData): void => {
+    const newRecipe: Recipe = {
+      ...recipeData,
+      id: generateId(),
+      userId: user?.id || '',
+      createdAt: new Date().toISOString(),
+    };
+    
+    setRecipes((prev) => [...prev, newRecipe]);
+  };
+
+  const updateRecipe = (id: string, updates: Partial<Recipe>): void => {
+    setRecipes((prev) =>
+      prev.map((recipe) =>
+        recipe.id === id
+          ? { ...recipe, ...updates, updatedAt: new Date().toISOString() }
+          : recipe
+      )
+    );
+  };
+
+  const deleteRecipe = (id: string): void => {
+    setRecipes((prev) => prev.filter((recipe) => recipe.id !== id));
+  };
+
+  const toggleFavorite = (id: string): void => {
+    setRecipes((prev) =>
+      prev.map((recipe) =>
+        recipe.id === id
+          ? { ...recipe, isFavorite: !recipe.isFavorite }
+          : recipe
+      )
+    );
+  };
+
+  // ==================== Context Value ====================
+  const value: AppContextType = {
+    user,
+    recipes,
+    login,
+    signup,
+    logout,
+    addRecipe,
+    updateRecipe,
+    deleteRecipe,
+    toggleFavorite,
+  };
+
+  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
+};
+
+// ==================== Custom Hook ====================
+export const useApp = (): AppContextType => {
+  const context = useContext(AppContext);
+  if (!context) {
+    throw new Error('useApp must be used within AppProvider');
+  }
+  return context;
+};
