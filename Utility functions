@@ -1,0 +1,125 @@
+import { Difficulty } from '../types';
+
+// ==================== 日付フォーマット ====================
+export const formatDate = (dateString: string): string => {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('ja-JP', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+};
+
+// ==================== 難易度ラベル ====================
+export const getDifficultyLabel = (difficulty: Difficulty): string => {
+  const labels: Record<Difficulty, string> = {
+    beginner: '初級',
+    intermediate: '中級',
+    advanced: '上級',
+  };
+  return labels[difficulty];
+};
+
+// ==================== 分量調整 ====================
+export const adjustAmount = (
+  amount: string,
+  originalServings: number,
+  newServings: number
+): string => {
+  const num = parseFloat(amount);
+  if (isNaN(num)) return amount;
+  
+  const adjusted = (num * newServings) / originalServings;
+  
+  // 小数点以下1桁まで表示、不要な0は削除
+  return adjusted % 1 === 0 ? adjusted.toString() : adjusted.toFixed(1);
+};
+
+// ==================== ID生成 ====================
+export const generateId = (): string => {
+  return Date.now().toString() + Math.random().toString(36).substr(2, 9);
+};
+
+// ==================== ローカルストレージ ====================
+export const storage = {
+  get: <T>(key: string): T | null => {
+    try {
+      const item = localStorage.getItem(key);
+      return item ? JSON.parse(item) : null;
+    } catch (error) {
+      console.error(`Error reading ${key} from localStorage:`, error);
+      return null;
+    }
+  },
+
+  set: <T>(key: string, value: T): void => {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+    } catch (error) {
+      console.error(`Error writing ${key} to localStorage:`, error);
+    }
+  },
+
+  remove: (key: string): void => {
+    try {
+      localStorage.removeItem(key);
+    } catch (error) {
+      console.error(`Error removing ${key} from localStorage:`, error);
+    }
+  },
+
+  clear: (): void => {
+    try {
+      localStorage.clear();
+    } catch (error) {
+      console.error('Error clearing localStorage:', error);
+    }
+  },
+};
+
+// ==================== バリデーション ====================
+export const validateEmail = (email: string): boolean => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+};
+
+export const validatePassword = (password: string): boolean => {
+  return password.length >= 8;
+};
+
+export const validateRecipe = (title: string): boolean => {
+  return title.trim().length > 0;
+};
+
+// ==================== 検索フィルター ====================
+export const filterRecipesBySearch = (
+  recipes: any[],
+  query: string
+): any[] => {
+  const lowerQuery = query.toLowerCase();
+  return recipes.filter(
+    (recipe) =>
+      recipe.title.toLowerCase().includes(lowerQuery) ||
+      recipe.ingredients.some((ing: any) =>
+        ing.name.toLowerCase().includes(lowerQuery)
+      )
+  );
+};
+
+export const filterRecipesByTag = (
+  recipes: any[],
+  tag: string
+): any[] => {
+  if (tag === 'すべて') return recipes;
+  if (tag === 'お気に入り') return recipes.filter((r) => r.isFavorite);
+  return recipes.filter((r) => r.tags.includes(tag));
+};
+
+// ==================== タグ抽出 ====================
+export const extractAllTags = (recipes: any[]): string[] => {
+  const tagSet = new Set<string>();
+  recipes.forEach((recipe) => {
+    recipe.tags.forEach((tag: string) => tagSet.add(tag));
+  });
+  return Array.from(tagSet).sort();
+};
