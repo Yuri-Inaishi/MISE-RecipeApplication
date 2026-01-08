@@ -1,0 +1,129 @@
+import React, { useState, useEffect } from 'react';
+import { AppProvider, useApp } from './contexts/AppContext';
+import { LoginScreen } from './components/auth/LoginScreen';
+import { Dashboard } from './components/recipe/Dashboard';
+import { RecipeForm } from './components/recipe/RecipeForm';
+import { RecipeDetail } from './components/recipe/RecipeDetail';
+import { Recipe } from './types';
+import { initializeSampleData } from './utils/sampleData';
+
+// ==================== View Types ====================
+type ViewType = 'login' | 'dashboard' | 'detail' | 'create' | 'edit';
+
+// ==================== Main App Component ====================
+const AppContent: React.FC = () => {
+  const { user } = useApp();
+  const [currentView, setCurrentView] = useState<ViewType>('login');
+  const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
+
+  // サンプルデータの初期化
+  useEffect(() => {
+    initializeSampleData();
+  }, []);
+
+  // ユーザーの認証状態に応じて画面を切り替え
+  useEffect(() => {
+    if (user) {
+      setCurrentView('dashboard');
+    } else {
+      setCurrentView('login');
+    }
+  }, [user]);
+
+  // ==================== Event Handlers ====================
+  const handleLogin = () => {
+    setCurrentView('dashboard');
+  };
+
+  const handleCreateRecipe = () => {
+    setSelectedRecipe(null);
+    setCurrentView('create');
+  };
+
+  const handleViewRecipe = (recipe: Recipe) => {
+    setSelectedRecipe(recipe);
+    setCurrentView('detail');
+  };
+
+  const handleEditRecipe = () => {
+    setCurrentView('edit');
+  };
+
+  const handleBack = () => {
+    setSelectedRecipe(null);
+    setCurrentView('dashboard');
+  };
+
+  const handleSave = () => {
+    setSelectedRecipe(null);
+    setCurrentView('dashboard');
+  };
+
+  // ==================== Render Views ====================
+  
+  // ログイン画面
+  if (currentView === 'login' || !user) {
+    return <LoginScreen onLogin={handleLogin} />;
+  }
+
+  // ダッシュボード
+  if (currentView === 'dashboard') {
+    return (
+      <Dashboard
+        onCreateRecipe={handleCreateRecipe}
+        onViewRecipe={handleViewRecipe}
+      />
+    );
+  }
+
+  // レシピ詳細画面
+  if (currentView === 'detail' && selectedRecipe) {
+    return (
+      <RecipeDetail
+        recipe={selectedRecipe}
+        onBack={handleBack}
+        onEdit={handleEditRecipe}
+      />
+    );
+  }
+
+  // レシピ作成画面
+  if (currentView === 'create') {
+    return (
+      <RecipeForm
+        onBack={handleBack}
+        onSave={handleSave}
+      />
+    );
+  }
+
+  // レシピ編集画面
+  if (currentView === 'edit' && selectedRecipe) {
+    return (
+      <RecipeForm
+        recipe={selectedRecipe}
+        onBack={handleBack}
+        onSave={handleSave}
+      />
+    );
+  }
+
+  // デフォルトはダッシュボード
+  return (
+    <Dashboard
+      onCreateRecipe={handleCreateRecipe}
+      onViewRecipe={handleViewRecipe}
+    />
+  );
+};
+
+// ==================== Root Component ====================
+const App: React.FC = () => {
+  return (
+    <AppProvider>
+      <AppContent />
+    </AppProvider>
+  );
+};
+
+export default App;
